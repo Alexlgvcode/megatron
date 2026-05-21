@@ -1,8 +1,7 @@
-// Thin fetch wrapper. The Vite dev server proxies /api -> http://localhost:8000
-// (see vite.config.js), so in dev the frontend can use relative URLs.
+const BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function request(path, options = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
@@ -37,7 +36,7 @@ export const api = {
     fd.append("file", file);
     fd.append("doc_type", docType);
     if (title) fd.append("title", title);
-    const res = await fetch("/api/documents", { method: "POST", body: fd });
+    const res = await fetch(`${BASE}/api/documents`, { method: "POST", body: fd });
     if (!res.ok) {
       let msg = `${res.status} ${res.statusText}`;
       try {
