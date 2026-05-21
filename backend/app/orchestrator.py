@@ -83,9 +83,10 @@ def handle_question(question: str, session_id: str | None = None) -> ChatRespons
                 answer=None,
                 sources=context,
             )
-            escalation.create_escalation(qid)
+            esc_id = escalation.create_escalation(qid)
             return ChatResponse(
                 question_id=qid,
+                escalation_id=esc_id,
                 intent=decision.intent,
                 confidence=decision.confidence,
                 routed_to=routed_to,
@@ -111,11 +112,13 @@ def handle_question(question: str, session_id: str | None = None) -> ChatRespons
         answer=answer,
         sources=context,
     )
+    esc_id: int | None = None
     if escalated:
-        escalation.create_escalation(qid)
+        esc_id = escalation.create_escalation(qid)
 
     return ChatResponse(
         question_id=qid,
+        escalation_id=esc_id,
         intent=decision.intent,
         confidence=decision.confidence,
         routed_to=routed_to,

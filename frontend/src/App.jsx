@@ -3,16 +3,37 @@ import Layout from "./components/Layout.jsx";
 import StudentChat from "./pages/StudentChat.jsx";
 import InstructorDashboard from "./pages/InstructorDashboard.jsx";
 import AdminUpload from "./pages/AdminUpload.jsx";
+import DevView from "./pages/DevView.jsx";
+
+const PROFESSOR_TABS = [
+  { to: "/professor", label: "Escalation queue", end: true },
+  { to: "/professor/materials", label: "Course materials" },
+];
+
+const DEV_TABS = [
+  { to: "/dev", label: "Question log", end: true },
+];
 
 export default function App() {
   return (
     <Routes>
+      {/* Student portal — no nav tabs */}
       <Route element={<Layout />}>
         <Route path="/" element={<StudentChat />} />
-        <Route path="/dashboard" element={<InstructorDashboard />} />
-        <Route path="/admin" element={<AdminUpload />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
+
+      {/* Professor portal */}
+      <Route element={<Layout tabs={PROFESSOR_TABS} />}>
+        <Route path="/professor" element={<InstructorDashboard />} />
+        <Route path="/professor/materials" element={<AdminUpload />} />
+      </Route>
+
+      {/* Developer portal */}
+      <Route element={<Layout tabs={DEV_TABS} />}>
+        <Route path="/dev" element={<DevView />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
