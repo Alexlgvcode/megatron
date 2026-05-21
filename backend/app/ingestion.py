@@ -1,20 +1,21 @@
 """Document ingestion pipeline.
 
 Steps:
-  1. Read raw text from the uploaded file (.txt, .md, .pdf).
+  1. Read raw text from the uploaded bytes (.txt, .md, .pdf).
   2. Chunk into overlapping windows so embedding context is preserved.
   3. Push chunks into the vector store with metadata.
-  4. Record the document row in SQLite so the admin UI can list / delete it.
+  4. Upload the raw file to Supabase Storage.
+  5. Record the document row in Supabase PostgreSQL.
 """
 from __future__ import annotations
 
+import io
 import re
 import uuid
 from datetime import datetime
 from pathlib import Path
 
-from . import vectorstore
-from .config import get_settings
+from . import vectorstore, supabase_storage
 from .db import DocumentRecord, session_scope
 from .schemas import DocumentInfo
 
@@ -23,16 +24,16 @@ CHUNK_TARGET_CHARS = 900
 CHUNK_OVERLAP_CHARS = 150
 
 
-# ---------- file -> text ----------
+# ---------- bytes -> text ----------
 
-def _read_text(path: Path) -> str:
-    suffix = path.suffix.lower()
+def _read_text(raw_bytes: bytes, filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
     if suffix == ".pdf":
         from pypdf import PdfReader  # local import keeps cold start lean
-        reader = PdfReader(str(path))
+        reader = PdfReader(io.BytesIO(raw_bytes))
         return "\n\n".join((p.extract_text() or "") for p in reader.pages)
     # .txt, .md, anything textual
-    return path.read_text(encoding="utf-8", errors="ignore")
+    return raw_bytes.decode("utf-8", errors="ignore")
 
 
 # ---------- chunking ----------
@@ -78,19 +79,23 @@ def chunk_text(text: str) -> list[str]:
 # ---------- public api ----------
 
 def ingest_file(*, filename: str, raw_bytes: bytes, doc_type: str, title: str | None = None) -> DocumentInfo:
-    settings = get_settings()
     doc_id = uuid.uuid4().hex
     safe_name = filename.replace("/", "_").replace("\\", "_")
-    target = settings.upload_path / f"{doc_id}__{safe_name}"
-    target.write_bytes(raw_bytes)
 
-    text = _read_text(target)
+    text = _read_text(raw_bytes, safe_name)
     chunks = chunk_text(text)
     vectorstore.add_chunks(
         doc_id=doc_id,
         filename=safe_name,
         doc_type=doc_type,
         chunks=chunks,
+    )
+
+    storage_path = f"{doc_id}__{safe_name}"
+    storage_url = supabase_storage.upload_file(
+        path=storage_path,
+        data=raw_bytes,
+        filename=safe_name,
     )
 
     with session_scope() as s:
@@ -100,6 +105,7 @@ def ingest_file(*, filename: str, raw_bytes: bytes, doc_type: str, title: str | 
             title=title or safe_name,
             doc_type=doc_type,
             chunk_count=len(chunks),
+            storage_url=storage_url,
             uploaded_at=datetime.utcnow(),
         )
         s.add(rec)
@@ -111,6 +117,7 @@ def ingest_file(*, filename: str, raw_bytes: bytes, doc_type: str, title: str | 
             title=rec.title,
             doc_type=rec.doc_type,
             chunk_count=rec.chunk_count,
+            storage_url=rec.storage_url,
             uploaded_at=rec.uploaded_at,
         )
 
@@ -125,6 +132,7 @@ def list_documents() -> list[DocumentInfo]:
                 title=r.title,
                 doc_type=r.doc_type,
                 chunk_count=r.chunk_count,
+                storage_url=r.storage_url,
                 uploaded_at=r.uploaded_at,
             )
             for r in rows
@@ -137,6 +145,8 @@ def delete_document(doc_id: str) -> bool:
         rec = s.query(DocumentRecord).filter(DocumentRecord.id == doc_id).one_or_none()
         if rec is None:
             return False
+        storage_path = f"{rec.id}__{rec.filename}"
         s.delete(rec)
         s.commit()
+    supabase_storage.delete_file(storage_path)
     return True

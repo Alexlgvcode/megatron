@@ -37,8 +37,84 @@ function EscalatedPanel({ escalations }) {
   );
 }
 
-function MessageBubble({ msg }) {
+const RATING_OPTIONS = [
+  { value: "thumbs_up", emoji: "👍", label: "Helpful" },
+  { value: "neutral", emoji: "😐", label: "Okay" },
+  { value: "thumbs_down", emoji: "👎", label: "Wrong" },
+];
+
+function FeedbackWidget({ questionId, sessionId }) {
+  const [selected, setSelected] = useState(null);
+  const [comment, setComment] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      await api.submitFeedback({ questionId, rating: selected, comment: comment.trim() || null, sessionId });
+      setSubmitted(true);
+    } catch {
+      // silently ignore — feedback is best-effort
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="mt-3 border-t border-slate-100 pt-2 text-[12px] text-slate-400 italic">
+        Thanks for your feedback
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-2">
+      <p className="text-[11px] text-slate-400 mb-1.5">Was this answer helpful?</p>
+      <div className="flex gap-1.5">
+        {RATING_OPTIONS.map(({ value, emoji, label }) => (
+          <button
+            key={value}
+            onClick={() => setSelected(selected === value ? null : value)}
+            title={label}
+            className={[
+              "text-base px-2.5 py-0.5 rounded border transition",
+              selected === value
+                ? "border-navy bg-navy/10"
+                : "border-slate-200 hover:border-slate-400",
+            ].join(" ")}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <div className="mt-2">
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            placeholder="Optional: anything to add?"
+            className="w-full rounded border border-slate-200 px-2 py-1.5 text-[12px] focus:outline-none focus:border-navy resize-none"
+          />
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="mt-1 text-[12px] px-3 py-1 bg-navy text-white rounded hover:bg-navy/90 disabled:opacity-50"
+          >
+            {submitting ? "Submitting…" : "Submit"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ msg, sessionId }) {
   const isUser = msg.role === "user";
+  const showFeedback = !isUser && msg.question_id && !msg.escalated && msg.routed === "student";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -97,6 +173,9 @@ function MessageBubble({ msg }) {
               {msg.reasoning}
             </p>
           </details>
+        )}
+        {showFeedback && (
+          <FeedbackWidget questionId={msg.question_id} sessionId={sessionId} />
         )}
       </div>
     </div>
@@ -183,6 +262,7 @@ export default function StudentChat() {
           id: uid(),
           role: "assistant",
           text: replyText,
+          question_id: res.question_id,
           escalated: res.escalated,
           routed: res.routed_to,
           confidence: res.confidence,
@@ -229,7 +309,7 @@ export default function StudentChat() {
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4 bg-slate-50">
           {messages.map((m) => (
-            <MessageBubble key={m.id} msg={m} />
+            <MessageBubble key={m.id} msg={m} sessionId={sessionId} />
           ))}
           {busy && (
             <div className="flex justify-start">

@@ -27,10 +27,14 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.65
     top_k: int = 5
 
-    # Storage paths (resolved relative to BACKEND_ROOT)
+    # ChromaDB (still local)
     chroma_dir: str = "data/chroma"
-    upload_dir: str = "data/uploads"
-    sqlite_path: str = "data/megatron.db"
+
+    # Supabase
+    supabase_url: str = ""
+    supabase_key: str = ""
+    database_url: str = ""          # PostgreSQL connection string from Supabase
+    supabase_bucket: str = "course-materials"
 
     # CORS
     frontend_origin: str = "http://localhost:5173"
@@ -39,19 +43,9 @@ class Settings(BaseSettings):
     def chroma_path(self) -> Path:
         return (BACKEND_ROOT / self.chroma_dir).resolve()
 
-    @property
-    def upload_path(self) -> Path:
-        return (BACKEND_ROOT / self.upload_dir).resolve()
-
-    @property
-    def sqlite_url(self) -> str:
-        return f"sqlite:///{(BACKEND_ROOT / self.sqlite_path).resolve()}"
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     s = Settings()
     s.chroma_path.mkdir(parents=True, exist_ok=True)
-    s.upload_path.mkdir(parents=True, exist_ok=True)
-    (BACKEND_ROOT / s.sqlite_path).parent.mkdir(parents=True, exist_ok=True)
     return s

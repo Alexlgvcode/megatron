@@ -64,4 +64,17 @@ export const api = {
 
   // log
   listQuestions: (limit = 100) => request(`/api/questions?limit=${limit}`),
+
+  // feedback
+  submitFeedback: ({ questionId, rating, comment, sessionId }) =>
+    request("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({
+        question_id: questionId,
+        rating,
+        comment: comment || null,
+        session_id: sessionId || null,
+      }),
+    }),
+  listFeedback: () => request("/api/feedback"),
 };

@@ -1,12 +1,11 @@
-"""SQLite-backed storage for the question log and escalation queue.
+"""PostgreSQL-backed storage for the question log and escalation queue.
 
-We keep this dependency-light: a single SQLAlchemy engine with two tables.
+Uses Supabase's managed PostgreSQL via SQLAlchemy.
 The vector store lives in ChromaDB (see vectorstore.py).
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Column,
@@ -18,7 +17,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import get_settings
 
@@ -30,11 +29,12 @@ class Base(DeclarativeBase):
 class DocumentRecord(Base):
     __tablename__ = "documents"
 
-    id = Column(String, primary_key=True)            # uuid
+    id = Column(String, primary_key=True)
     filename = Column(String, nullable=False)
     title = Column(String, nullable=False)
     doc_type = Column(String, nullable=False)
     chunk_count = Column(Integer, nullable=False, default=0)
+    storage_url = Column(String, nullable=True)       # public URL in Supabase Storage
     uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -64,6 +64,17 @@ class EscalationRecord(Base):
     answered_at = Column(DateTime, nullable=True)
 
 
+class FeedbackRecord(Base):
+    __tablename__ = "feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
+    rating = Column(String, nullable=False)   # thumbs_up | neutral | thumbs_down
+    comment = Column(Text, nullable=True)
+    session_id = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 _engine = None
 _SessionLocal = None
 
@@ -72,7 +83,7 @@ def init_db():
     """Create tables; safe to call multiple times."""
     global _engine, _SessionLocal
     settings = get_settings()
-    _engine = create_engine(settings.sqlite_url, future=True)
+    _engine = create_engine(settings.database_url, future=True)
     _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, future=True)
     Base.metadata.create_all(_engine)
 

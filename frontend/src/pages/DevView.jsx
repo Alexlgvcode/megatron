@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { formatTime, pct } from "../lib/format";
 
+const RATING_LABELS = {
+  thumbs_up: { emoji: "👍", label: "Helpful", color: "text-emerald-600" },
+  neutral: { emoji: "😐", label: "Okay", color: "text-amber-500" },
+  thumbs_down: { emoji: "👎", label: "Wrong", color: "text-rose-600" },
+};
+
 function RouteBadge({ routed }) {
   return routed === "student" ? (
     <span className="tag tag-teal">Answered by AI</span>
@@ -18,8 +24,10 @@ function IntentBadge({ intent }) {
   );
 }
 
-function QuestionRow({ item }) {
+function QuestionRow({ item, feedback }) {
   const [open, setOpen] = useState(false);
+  const r = feedback ? (RATING_LABELS[feedback.rating] ?? { emoji: "?", label: feedback.rating, color: "text-slate-500" }) : null;
+
   return (
     <article className="panel py-3">
       <div
@@ -44,6 +52,11 @@ function QuestionRow({ item }) {
                   session {item.session_id}
                 </span>
               </>
+            )}
+            {r && (
+              <span className={`font-mono text-[11px] font-medium ${r.color}`}>
+                · {r.emoji} {r.label}
+              </span>
             )}
           </div>
           <p className="text-[14px] text-slate-900 leading-snug">
@@ -75,6 +88,20 @@ function QuestionRow({ item }) {
               </p>
             </div>
           )}
+          {feedback && (
+            <div className="md:col-span-2 border-t border-slate-100 pt-3">
+              <h4 className="font-mono text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                Student feedback
+              </h4>
+              <div className={`flex items-center gap-1.5 font-medium ${r.color}`}>
+                <span className="text-base">{r.emoji}</span>
+                <span className="text-sm">{r.label}</span>
+              </div>
+              {feedback.comment && (
+                <p className="mt-1 text-sm text-slate-700 italic">"{feedback.comment}"</p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -83,6 +110,7 @@ function QuestionRow({ item }) {
 
 export default function DevView() {
   const [items, setItems] = useState([]);
+  const [feedbackMap, setFeedbackMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -91,8 +119,13 @@ export default function DevView() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await api.listQuestions(200);
-      setItems(data);
+      const [questions, feedback] = await Promise.all([
+        api.listQuestions(200),
+        api.listFeedback(),
+      ]);
+      setItems(questions);
+      // last feedback per question_id wins (students can only submit once, but just in case)
+      setFeedbackMap(Object.fromEntries(feedback.map((f) => [f.question_id, f])));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -123,8 +156,7 @@ export default function DevView() {
         <div>
           <h2 className="font-display text-2xl text-navy">Question log</h2>
           <p className="text-sm text-slate-500">
-            All questions submitted by students, with routing decisions and
-            classifier reasoning. Auto-refreshes every 15s.
+            All questions with routing decisions and student feedback. Auto-refreshes every 15s.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -167,7 +199,7 @@ export default function DevView() {
 
       <div className="flex flex-col gap-2">
         {filtered.map((item) => (
-          <QuestionRow key={item.id} item={item} />
+          <QuestionRow key={item.id} item={item} feedback={feedbackMap[item.id] ?? null} />
         ))}
       </div>
     </div>

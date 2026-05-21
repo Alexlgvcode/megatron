@@ -9,12 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import escalation, ingestion, orchestrator, vectorstore
 from .config import get_settings
-from .db import QuestionRecord, init_db, session_scope
+from .db import FeedbackRecord, QuestionRecord, init_db, session_scope
 from .schemas import (
     ChatRequest,
     ChatResponse,
     DocumentInfo,
     EscalationListItem,
+    FeedbackItem,
+    FeedbackRequest,
     IngestResponse,
     InstructorAnswerRequest,
     QuestionLogItem,
@@ -164,3 +166,56 @@ def list_questions(limit: int = 100) -> list[QuestionLogItem]:
 @app.get("/api/retrieve", response_model=list[RetrievedChunk])
 def retrieve(q: str, k: int | None = None) -> list[RetrievedChunk]:
     return vectorstore.query(q, top_k=k or settings.top_k)
+
+
+# ---------- Feedback ----------
+
+@app.post("/api/feedback", response_model=FeedbackItem)
+def submit_feedback(body: FeedbackRequest) -> FeedbackItem:
+    with session_scope() as s:
+        qrec = s.query(QuestionRecord).filter(QuestionRecord.id == body.question_id).one_or_none()
+        if qrec is None:
+            raise HTTPException(status_code=404, detail="question not found")
+        rec = FeedbackRecord(
+            question_id=body.question_id,
+            rating=body.rating,
+            comment=body.comment or None,
+            session_id=body.session_id,
+        )
+        s.add(rec)
+        s.commit()
+        s.refresh(rec)
+        return FeedbackItem(
+            id=rec.id,
+            question_id=rec.question_id,
+            question=qrec.question,
+            answer=qrec.answer,
+            rating=rec.rating,
+            comment=rec.comment,
+            session_id=rec.session_id,
+            created_at=rec.created_at,
+        )
+
+
+@app.get("/api/feedback", response_model=list[FeedbackItem])
+def list_feedback() -> list[FeedbackItem]:
+    with session_scope() as s:
+        rows = (
+            s.query(FeedbackRecord, QuestionRecord)
+            .join(QuestionRecord, FeedbackRecord.question_id == QuestionRecord.id)
+            .order_by(FeedbackRecord.created_at.desc())
+            .all()
+        )
+        return [
+            FeedbackItem(
+                id=fb.id,
+                question_id=qrec.id,
+                question=qrec.question,
+                answer=qrec.answer,
+                rating=fb.rating,
+                comment=fb.comment,
+                session_id=fb.session_id,
+                created_at=fb.created_at,
+            )
+            for fb, qrec in rows
+        ]

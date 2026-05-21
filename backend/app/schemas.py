@@ -15,6 +15,7 @@ class DocumentInfo(BaseModel):
     title: str
     doc_type: str  # syllabus | rubric | assignment | faq | other
     chunk_count: int
+    storage_url: Optional[str] = None
     uploaded_at: datetime
 
 
@@ -93,3 +94,23 @@ class QuestionLogItem(BaseModel):
     reasoning: str
     created_at: datetime
     session_id: Optional[str]
+
+
+# ---------- Feedback ----------
+
+class FeedbackRequest(BaseModel):
+    question_id: int
+    rating: Literal["thumbs_up", "neutral", "thumbs_down"]
+    comment: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class FeedbackItem(BaseModel):
+    id: int
+    question_id: int
+    question: str
+    answer: Optional[str]
+    rating: Literal["thumbs_up", "neutral", "thumbs_down"]
+    comment: Optional[str]
+    session_id: Optional[str]
+    created_at: datetime
