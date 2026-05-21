@@ -108,6 +108,14 @@ def list_escalations(status: Literal["pending", "answered"] | None = None) -> li
     return escalation.list_escalations(status=status)
 
 
+@app.get("/api/escalations/{escalation_id}", response_model=EscalationListItem)
+def get_escalation(escalation_id: int) -> EscalationListItem:
+    items = [e for e in escalation.list_escalations() if e.id == escalation_id]
+    if not items:
+        raise HTTPException(status_code=404, detail="escalation not found")
+    return items[0]
+
+
 @app.delete("/api/escalations/{escalation_id}")
 def delete_escalation(escalation_id: int) -> dict:
     ok = escalation.delete_escalation(escalation_id)
@@ -143,6 +151,7 @@ def list_questions(limit: int = 100) -> list[QuestionLogItem]:
                 confidence=r.confidence,
                 routed_to=r.routed_to,
                 answer=r.answer,
+                reasoning=r.reasoning,
                 created_at=r.created_at,
                 session_id=r.session_id,
             )

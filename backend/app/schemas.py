@@ -51,6 +51,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     question_id: int
+    escalation_id: Optional[int] = None
     intent: Intent
     confidence: float
     routed_to: Literal["student", "instructor"]
@@ -89,5 +90,6 @@ class QuestionLogItem(BaseModel):
     confidence: float
     routed_to: Literal["student", "instructor"]
     answer: Optional[str]
+    reasoning: str
     created_at: datetime
     session_id: Optional[str]

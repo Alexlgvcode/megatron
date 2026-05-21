@@ -2,11 +2,11 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
-function TabLink({ to, children }) {
+function TabLink({ to, end, children }) {
   return (
     <NavLink
       to={to}
-      end
+      end={end}
       className={({ isActive }) =>
         [
           "px-4 py-2 rounded text-sm font-semibold transition",
@@ -21,7 +21,8 @@ function TabLink({ to, children }) {
   );
 }
 
-export default function Layout() {
+// tabs: [{ to, label, end? }]
+export default function Layout({ tabs = [] }) {
   const [health, setHealth] = useState(null);
 
   useEffect(() => {
@@ -45,11 +46,15 @@ export default function Layout() {
               AI Teaching Assistant
             </span>
           </div>
-          <nav className="ml-6 flex items-center gap-1">
-            <TabLink to="/">Student chat</TabLink>
-            <TabLink to="/dashboard">Instructor dashboard</TabLink>
-            <TabLink to="/admin">Admin</TabLink>
-          </nav>
+          {tabs.length > 0 && (
+            <nav className="ml-6 flex items-center gap-1">
+              {tabs.map((t) => (
+                <TabLink key={t.to} to={t.to} end={t.end}>
+                  {t.label}
+                </TabLink>
+              ))}
+            </nav>
+          )}
           <div className="ml-auto flex items-center gap-2 text-xs font-mono">
             <span
               className={`inline-block w-2 h-2 rounded-full ${

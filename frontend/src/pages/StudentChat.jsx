@@ -3,8 +3,38 @@ import { api } from "../lib/api";
 import { pct } from "../lib/format";
 import SourcesList from "../components/SourcesList.jsx";
 
+const POLL_INTERVAL_MS = 8000;
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function EscalatedPanel({ escalations }) {
+  const entries = Object.entries(escalations);
+  if (entries.length === 0) return null;
+  return (
+    <div className="panel">
+      <h3 className="panel-head">Escalated Questions</h3>
+      <div className="flex flex-col gap-3">
+        {entries.map(([id, esc]) => (
+          <div key={id} className="text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+            <p className="font-medium text-slate-800 line-clamp-2">{esc.question}</p>
+            {esc.status === "pending" ? (
+              <div className="mt-1 flex items-center gap-1.5 text-[12px] text-amber-600">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+                Waiting for reply…
+              </div>
+            ) : (
+              <div className="mt-2">
+                <span className="tag tag-teal text-[11px]">Instructor reply</span>
+                <p className="mt-1 text-slate-700 whitespace-pre-wrap">{esc.answer}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function MessageBubble({ msg }) {
@@ -25,6 +55,11 @@ function MessageBubble({ msg }) {
             <span className="text-[11px] text-slate-500">
               forwarded to your instructor
             </span>
+          </div>
+        )}
+        {msg.instructorReply && !isUser && (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="tag tag-teal">Instructor reply</span>
           </div>
         )}
         {msg.routed === "student" && !isUser && (
@@ -81,12 +116,55 @@ export default function StudentChat() {
   ]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // { [escalation_id]: { question, status, answer } }
+  const [escalations, setEscalations] = useState({});
   const sessionId = useMemo(() => uid(), []);
   const endRef = useRef(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const pendingIds = Object.entries(escalations)
+    .filter(([, v]) => v.status === "pending")
+    .map(([id]) => Number(id));
+
+  // Poll for instructor replies on any pending escalations.
+  useEffect(() => {
+    if (pendingIds.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const escalation_id of pendingIds) {
+        try {
+          const esc = await api.getEscalation(escalation_id);
+          if (esc.status === "answered" && esc.instructor_answer) {
+            setEscalations((prev) => ({
+              ...prev,
+              [escalation_id]: {
+                ...prev[escalation_id],
+                status: "answered",
+                answer: esc.instructor_answer,
+              },
+            }));
+            setMessages((m) => [
+              ...m,
+              {
+                id: uid(),
+                role: "assistant",
+                text: "Your instructor replied — see the panel on the right.",
+                instructorNotification: true,
+              },
+            ]);
+          }
+        } catch {
+          // If the escalation was deleted or unreachable, stop polling it
+        }
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingIds.join(",")]);
 
   async function send() {
     const text = draft.trim();
@@ -98,7 +176,7 @@ export default function StudentChat() {
       const res = await api.ask(text, sessionId);
       const replyText = res.answer
         ? res.answer
-        : `Thanks — I've forwarded this to your instructor. You'll get a reply on the dashboard once they respond.`;
+        : `Your question has been forwarded to your instructor. Their reply will appear in the panel on the right.`;
       setMessages((m) => [
         ...m,
         {
@@ -112,6 +190,12 @@ export default function StudentChat() {
           reasoning: res.reasoning,
         },
       ]);
+      if (res.escalated && res.escalation_id != null) {
+        setEscalations((prev) => ({
+          ...prev,
+          [res.escalation_id]: { question: text, status: "pending", answer: null },
+        }));
+      }
     } catch (err) {
       setMessages((m) => [
         ...m,
@@ -182,6 +266,7 @@ export default function StudentChat() {
       </section>
 
       <aside className="flex flex-col gap-4">
+        <EscalatedPanel escalations={escalations} />
         <div className="panel">
           <h3 className="panel-head">How this works</h3>
           <ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">
@@ -198,11 +283,11 @@ export default function StudentChat() {
             Try asking
           </h3>
           <ul className="text-sm text-slate-700 space-y-1">
-            <li>“When is the next assignment due?”</li>
-            <li>“What's the late policy?”</li>
-            <li>“How is participation weighted?”</li>
+            <li>"When is the next assignment due?"</li>
+            <li>"What's the late policy?"</li>
+            <li>"How is participation weighted?"</li>
             <li>
-              “Can I get an extension because I'm sick?” <em>(escalates)</em>
+              "Can I get an extension because I'm sick?" <em>(escalates)</em>
             </li>
           </ul>
         </div>

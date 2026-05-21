@@ -53,6 +53,7 @@ export const api = {
   // escalations
   listEscalations: (status) =>
     request(`/api/escalations${status ? `?status=${status}` : ""}`),
+  getEscalation: (id) => request(`/api/escalations/${id}`),
   answerEscalation: (id, answer) =>
     request(`/api/escalations/${id}/answer`, {
       method: "POST",
