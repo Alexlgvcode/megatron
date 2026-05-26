@@ -75,6 +75,16 @@ class FeedbackRecord(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class EscalationFeedbackRecord(Base):
+    __tablename__ = "escalation_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    escalation_id = Column(Integer, ForeignKey("escalations.id"), nullable=False)
+    rating = Column(String, nullable=False)   # thumbs_up | neutral | thumbs_down
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 _engine = None
 _SessionLocal = None
 

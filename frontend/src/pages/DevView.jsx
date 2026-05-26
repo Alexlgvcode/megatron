@@ -24,9 +24,10 @@ function IntentBadge({ intent }) {
   );
 }
 
-function QuestionRow({ item, feedback }) {
+function QuestionRow({ item, feedback, escalationFeedback }) {
   const [open, setOpen] = useState(false);
   const r = feedback ? (RATING_LABELS[feedback.rating] ?? { emoji: "?", label: feedback.rating, color: "text-slate-500" }) : null;
+  const er = escalationFeedback ? (RATING_LABELS[escalationFeedback.rating] ?? { emoji: "?", label: escalationFeedback.rating, color: "text-slate-500" }) : null;
 
   return (
     <article className="panel py-3">
@@ -56,6 +57,11 @@ function QuestionRow({ item, feedback }) {
             {r && (
               <span className={`font-mono text-[11px] font-medium ${r.color}`}>
                 · {r.emoji} {r.label}
+              </span>
+            )}
+            {er && (
+              <span className={`font-mono text-[11px] font-medium ${er.color}`}>
+                · {er.emoji} {er.label} <span className="text-slate-400 font-normal">(instructor)</span>
               </span>
             )}
           </div>
@@ -102,6 +108,20 @@ function QuestionRow({ item, feedback }) {
               )}
             </div>
           )}
+          {escalationFeedback && (
+            <div className="md:col-span-2 border-t border-slate-100 pt-3">
+              <h4 className="font-mono text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                Instructor feedback
+              </h4>
+              <div className={`flex items-center gap-1.5 font-medium ${er.color}`}>
+                <span className="text-base">{er.emoji}</span>
+                <span className="text-sm">{er.label}</span>
+              </div>
+              {escalationFeedback.comment && (
+                <p className="mt-1 text-sm text-slate-700 italic">"{escalationFeedback.comment}"</p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -111,6 +131,7 @@ function QuestionRow({ item, feedback }) {
 export default function DevView() {
   const [items, setItems] = useState([]);
   const [feedbackMap, setFeedbackMap] = useState({});
+  const [escalationFeedbackMap, setEscalationFeedbackMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -119,13 +140,14 @@ export default function DevView() {
     setLoading(true);
     setErr(null);
     try {
-      const [questions, feedback] = await Promise.all([
+      const [questions, feedback, escalationFeedback] = await Promise.all([
         api.listQuestions(200),
         api.listFeedback(),
+        api.listEscalationFeedback(),
       ]);
       setItems(questions);
-      // last feedback per question_id wins (students can only submit once, but just in case)
       setFeedbackMap(Object.fromEntries(feedback.map((f) => [f.question_id, f])));
+      setEscalationFeedbackMap(Object.fromEntries(escalationFeedback.map((f) => [f.question_id, f])));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -199,7 +221,12 @@ export default function DevView() {
 
       <div className="flex flex-col gap-2">
         {filtered.map((item) => (
-          <QuestionRow key={item.id} item={item} feedback={feedbackMap[item.id] ?? null} />
+          <QuestionRow
+            key={item.id}
+            item={item}
+            feedback={feedbackMap[item.id] ?? null}
+            escalationFeedback={escalationFeedbackMap[item.id] ?? null}
+          />
         ))}
       </div>
     </div>

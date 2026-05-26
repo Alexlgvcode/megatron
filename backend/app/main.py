@@ -9,11 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import escalation, ingestion, orchestrator, vectorstore
 from .config import get_settings
-from .db import FeedbackRecord, QuestionRecord, init_db, session_scope
+from .db import EscalationFeedbackRecord, EscalationRecord, FeedbackRecord, QuestionRecord, init_db, session_scope
 from .schemas import (
     ChatRequest,
     ChatResponse,
     DocumentInfo,
+    EscalationFeedbackItem,
+    EscalationFeedbackRequest,
     EscalationListItem,
     FeedbackItem,
     FeedbackRequest,
@@ -116,6 +118,52 @@ def get_escalation(escalation_id: int) -> EscalationListItem:
     if not items:
         raise HTTPException(status_code=404, detail="escalation not found")
     return items[0]
+
+
+@app.post("/api/escalations/{escalation_id}/feedback", response_model=EscalationFeedbackItem)
+def submit_escalation_feedback(escalation_id: int, body: EscalationFeedbackRequest) -> EscalationFeedbackItem:
+    with session_scope() as s:
+        esc = s.query(EscalationRecord).filter(EscalationRecord.id == escalation_id).one_or_none()
+        if esc is None:
+            raise HTTPException(status_code=404, detail="escalation not found")
+        rec = EscalationFeedbackRecord(
+            escalation_id=escalation_id,
+            rating=body.rating,
+            comment=body.comment or None,
+        )
+        s.add(rec)
+        s.commit()
+        s.refresh(rec)
+        return EscalationFeedbackItem(
+            id=rec.id,
+            escalation_id=rec.escalation_id,
+            question_id=esc.question_id,
+            rating=rec.rating,
+            comment=rec.comment,
+            created_at=rec.created_at,
+        )
+
+
+@app.get("/api/escalation-feedback", response_model=list[EscalationFeedbackItem])
+def list_escalation_feedback() -> list[EscalationFeedbackItem]:
+    with session_scope() as s:
+        rows = (
+            s.query(EscalationFeedbackRecord, EscalationRecord)
+            .join(EscalationRecord, EscalationFeedbackRecord.escalation_id == EscalationRecord.id)
+            .order_by(EscalationFeedbackRecord.created_at.desc())
+            .all()
+        )
+        return [
+            EscalationFeedbackItem(
+                id=fb.id,
+                escalation_id=fb.escalation_id,
+                question_id=esc.question_id,
+                rating=fb.rating,
+                comment=fb.comment,
+                created_at=fb.created_at,
+            )
+            for fb, esc in rows
+        ]
 
 
 @app.delete("/api/escalations/{escalation_id}")

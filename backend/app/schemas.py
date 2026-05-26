@@ -114,3 +114,17 @@ class FeedbackItem(BaseModel):
     comment: Optional[str]
     session_id: Optional[str]
     created_at: datetime
+
+
+class EscalationFeedbackRequest(BaseModel):
+    rating: Literal["thumbs_up", "neutral", "thumbs_down"]
+    comment: Optional[str] = None
+
+
+class EscalationFeedbackItem(BaseModel):
+    id: int
+    escalation_id: int
+    question_id: int
+    rating: Literal["thumbs_up", "neutral", "thumbs_down"]
+    comment: Optional[str]
+    created_at: datetime

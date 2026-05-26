@@ -76,4 +76,12 @@ export const api = {
       }),
     }),
   listFeedback: () => request("/api/feedback"),
+
+  // escalation feedback
+  submitEscalationFeedback: ({ escalationId, rating, comment }) =>
+    request(`/api/escalations/${escalationId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ rating, comment: comment || null }),
+    }),
+  listEscalationFeedback: () => request("/api/escalation-feedback"),
 };
