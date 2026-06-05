@@ -3,80 +3,6 @@ import { api } from "../lib/api";
 import { formatTime, pct } from "../lib/format";
 import SourcesList from "../components/SourcesList.jsx";
 
-const RATING_OPTIONS = [
-  { value: "thumbs_up", emoji: "👍", label: "Helpful" },
-  { value: "neutral", emoji: "😐", label: "Okay" },
-  { value: "thumbs_down", emoji: "👎", label: "Wrong" },
-];
-
-function EscalationFeedbackWidget({ escalationId }) {
-  const [selected, setSelected] = useState(null);
-  const [comment, setComment] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit() {
-    if (!selected) return;
-    setSubmitting(true);
-    try {
-      await api.submitEscalationFeedback({ escalationId, rating: selected, comment: comment.trim() || null });
-      setSubmitted(true);
-    } catch {
-      // best-effort
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (submitted) {
-    return (
-      <div className="mt-3 border-t border-slate-100 pt-2 text-[12px] text-slate-400 italic">
-        Thanks for your feedback
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 border-t border-slate-200 pt-3">
-      <p className="text-[11px] text-slate-400 mb-1.5">Rate this escalation</p>
-      <div className="flex gap-1.5">
-        {RATING_OPTIONS.map(({ value, emoji, label }) => (
-          <button
-            key={value}
-            onClick={() => setSelected(selected === value ? null : value)}
-            title={label}
-            className={[
-              "text-base px-2.5 py-0.5 rounded border transition",
-              selected === value
-                ? "border-navy bg-navy/10"
-                : "border-slate-200 hover:border-slate-400",
-            ].join(" ")}
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-      {selected && (
-        <div className="mt-2">
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={2}
-            placeholder="Optional: add a note"
-            className="w-full rounded border border-slate-200 px-2 py-1.5 text-[12px] focus:outline-none focus:border-navy resize-none"
-          />
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="mt-1 text-[12px] px-3 py-1 bg-navy text-white rounded hover:bg-navy/90 disabled:opacity-50"
-          >
-            {submitting ? "Submitting…" : "Submit"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function StatusBadge({ status }) {
   return status === "pending" ? (
@@ -173,7 +99,6 @@ function EscalationCard({ item, onAnswer, onDelete }) {
             Classifier reasoning
           </h4>
           <p className="text-sm text-slate-700 italic">{item.reasoning}</p>
-          <EscalationFeedbackWidget escalationId={item.id} />
         </div>
         <div>
           <h4 className="font-mono text-[10px] uppercase tracking-wider text-slate-500 mb-1">
