@@ -12,6 +12,81 @@ function StatusBadge({ status }) {
   );
 }
 
+const RATING_OPTIONS = [
+  { value: "thumbs_up", emoji: "👍", label: "Good escalation" },
+  { value: "neutral", emoji: "😐", label: "Borderline" },
+  { value: "thumbs_down", emoji: "👎", label: "Shouldn't have escalated" },
+];
+
+function EscalationFeedbackWidget({ escalationId }) {
+  const [selected, setSelected] = useState(null);
+  const [comment, setComment] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      await api.submitEscalationFeedback({ escalationId, rating: selected, comment: comment.trim() || null });
+      setSubmitted(true);
+    } catch {
+      // best-effort
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="mt-3 text-[12px] text-slate-400 italic">
+        Feedback recorded — thanks
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] text-slate-400 mb-1.5">Rate this escalation</p>
+      <div className="flex gap-1.5">
+        {RATING_OPTIONS.map(({ value, emoji, label }) => (
+          <button
+            key={value}
+            onClick={() => setSelected(selected === value ? null : value)}
+            title={label}
+            className={[
+              "text-base px-2.5 py-0.5 rounded border transition",
+              selected === value
+                ? "border-navy bg-navy/10"
+                : "border-slate-200 hover:border-slate-400",
+            ].join(" ")}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <div className="mt-2">
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            placeholder="Optional: any notes on the classifier's reasoning?"
+            className="w-full rounded border border-slate-200 px-2 py-1.5 text-[12px] focus:outline-none focus:border-navy resize-none"
+          />
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="mt-1 text-[12px] px-3 py-1 bg-navy text-white rounded hover:bg-navy/90 disabled:opacity-50"
+          >
+            {submitting ? "Submitting…" : "Submit feedback"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EscalationCard({ item, onAnswer, onDelete }) {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -110,27 +185,30 @@ function EscalationCard({ item, onAnswer, onDelete }) {
 
       {item.status === "pending" ? (
         <div className="mt-4 border-t border-slate-200 pt-3">
-          <label className="block text-sm font-semibold text-navy mb-1">
-            Your answer
-          </label>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={3}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:border-navy"
-            placeholder="Reply to the student. They'll see this in their chat history."
-          />
-          {error && (
-            <p className="text-sm text-rose-600 mt-1">Error: {error}</p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              className="btn-primary"
-              onClick={submit}
-              disabled={saving || !draft.trim()}
-            >
-              {saving ? "Sending…" : "Send to student"}
-            </button>
+          <EscalationFeedbackWidget escalationId={item.id} />
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-navy mb-1">
+              Your answer
+            </label>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={3}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:border-navy"
+              placeholder="Reply to the student. They'll see this in their chat history."
+            />
+            {error && (
+              <p className="text-sm text-rose-600 mt-1">Error: {error}</p>
+            )}
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                className="btn-primary"
+                onClick={submit}
+                disabled={saving || !draft.trim()}
+              >
+                {saving ? "Sending…" : "Send to student"}
+              </button>
+            </div>
           </div>
         </div>
       ) : (
