@@ -7,8 +7,7 @@ confidence score so the routing layer can apply a threshold.
 from __future__ import annotations
 
 from . import llm
-from .schemas import ClassifierOutput, RetrievedChunk
-
+from .schemas import ClassifierOutput, RetrievedChunk1
 
 SYSTEM_PROMPT = """You are the intent classifier for an AI teaching assistant.
 
