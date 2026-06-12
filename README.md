@@ -86,7 +86,7 @@ frontend uses relative URLs in both dev and production.
 
 ## 3. First-time setup
 
-1. Open <http://localhost:5173/admin>.
+1. Open <http://localhost:5173/dev>.
 2. Upload your syllabus (`.pdf`, `.txt`, or `.md`), rubrics, and any FAQs.
 3. Switch to **Student chat** and start asking questions.
 4. Substantive ones appear under **Instructor dashboard**.
@@ -104,6 +104,24 @@ All in `backend/.env`:
 | `CONFIDENCE_THRESHOLD`   | 0.65          | Routine answers below this score get escalated as a safety net |
 | `TOP_K`                  | 5             | Retrieved chunks per query                                    |
 
+## Feedback
+
+Two independent feedback loops are wired into the system:
+
+**Student feedback** — after the AI answers a routine question, the student
+sees a 👍 / 😐 / 👎 widget with an optional comment. Submitted via
+`POST /api/feedback`, stored in the `feedback` table.
+
+**Instructor escalation feedback** — when a new escalated question arrives in
+the dashboard, the professor can rate the quality of the AI's escalation
+decision (was it right to escalate?) before writing their reply. The widget
+disappears once the question is answered and moved to the answered section.
+Submitted via `POST /api/escalations/{id}/feedback`, stored in the
+`escalation_feedback` table.
+
+Both feeds are readable via `GET /api/feedback` and
+`GET /api/escalation-feedback` respectively.
+
 ## Evaluation hooks
 
 Slide 9 of the deck describes the eval plan. The pieces it depends on are
@@ -114,19 +132,26 @@ already wired:
 - Every escalation persists with sources + classifier reasoning, so an
   instructor can post-hoc label and compute precision/recall by class.
 - The question log doubles as ground-truth data for that labeling pass.
+- Instructor escalation feedback provides a direct signal for classifier
+  quality tuning.
 
 ## API surface
 
 ```
-GET    /api/health                       service + index stats
-POST   /api/chat                         { question, session_id } -> chat reply
-GET    /api/documents                    list indexed documents
-POST   /api/documents                    multipart upload
-DELETE /api/documents/{id}               remove a document
-GET    /api/escalations[?status=…]       instructor queue
-POST   /api/escalations/{id}/answer      { answer }
-GET    /api/questions?limit=100          full question log
-GET    /api/retrieve?q=…&k=…             retrieval probe (debug)
+GET    /api/health                          service + index stats
+POST   /api/chat                            { question, session_id } -> chat reply
+GET    /api/documents                       list indexed documents
+POST   /api/documents                       multipart upload
+DELETE /api/documents/{id}                  remove a document
+GET    /api/escalations[?status=…]          instructor queue
+POST   /api/escalations/{id}/answer         { answer }
+DELETE /api/escalations/{id}                remove an escalation
+POST   /api/escalations/{id}/feedback       { rating, comment } -> escalation feedback
+GET    /api/escalation-feedback             list all escalation feedback
+POST   /api/feedback                        { question_id, rating, comment } -> student feedback
+GET    /api/feedback                        list all student feedback
+GET    /api/questions?limit=100             full question log
+GET    /api/retrieve?q=…&k=…               retrieval probe (debug)
 ```
 
 ## Architecture mapping
