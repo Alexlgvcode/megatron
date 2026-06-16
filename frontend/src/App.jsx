@@ -4,6 +4,7 @@ import StudentChat from "./pages/StudentChat.jsx";
 import InstructorDashboard from "./pages/InstructorDashboard.jsx";
 import AdminUpload from "./pages/AdminUpload.jsx";
 import DevView from "./pages/DevView.jsx";
+import ArchitectureDeck from "./pages/ArchitectureDeck.jsx";
 
 const PROFESSOR_TABS = [
   { to: "/professor", label: "Escalation queue", end: true },
@@ -12,6 +13,7 @@ const PROFESSOR_TABS = [
 
 const DEV_TABS = [
   { to: "/dev", label: "Question log", end: true },
+  { to: "/dev/architecture", label: "Architecture" },
 ];
 
 export default function App() {
@@ -31,6 +33,7 @@ export default function App() {
       {/* Developer portal */}
       <Route element={<Layout tabs={DEV_TABS} />}>
         <Route path="/dev" element={<DevView />} />
+        <Route path="/dev/architecture" element={<ArchitectureDeck />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

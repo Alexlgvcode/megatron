@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Megatron · System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-body: 'Source Sans 3', 'Calibri', system-ui, sans-serif;
+    --font-display: 'Source Serif 4', 'Cambria', Georgia, serif;
+    --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
+    --navy: #0e2a4a;
+    --blue: #1862a8; --blue-soft: #e6eef7;
+    --teal: #167b7b; --teal-soft: #e1eeee;
+    --violet: #5b4fcf; --violet-soft: #ede9ff;
+    --amber: #b45309; --amber-soft: #fef3c7;
+    --slate: #475569; --slate-2: #64748b;
+    --gray-50: #f8fafc; --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-900: #0f172a;
+    --border: var(--gray-200);
+    --text: var(--gray-900); --text-dim: var(--slate); --text-faint: var(--slate-2);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    color: var(--text);
+    font-family: var(--font-body);
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-header {
+    padding: 18px 32px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .page-header h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--navy);
+    margin: 0 0 2px;
+    line-height: 1.2;
+  }
+  .page-header p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .canvas {
+    flex: 1;
+    min-height: 0;
+    padding: 20px 24px;
+    overflow: auto;
+  }
+
+  .canvas svg {
+    width: 100%;
+    height: 100%;
+    min-width: 900px;
+    display: block;
+  }
+
+  /* arch cards used inside foreignObject */
+  .arch-card { width:100%; height:100%; background:#fff; border:1px solid var(--border); border-radius:4px; padding:9px 13px; display:flex; flex-direction:column; gap:4px; box-sizing:border-box; box-shadow:0 1px 0 rgba(15,23,42,0.04); overflow:hidden; color:var(--text); font-family:var(--font-body); }
+  .arch-card__head { display:flex; align-items:center; gap:10px; margin-bottom:1px; }
+  .arch-card__icon { width:22px; height:22px; flex-shrink:0; }
+  .arch-card__icon svg { width:100%; height:100%; display:block; }
+  .arch-card__name { font-size:13px; font-weight:700; color:var(--navy); line-height:1.2; flex:1; min-width:0; }
+  .arch-card__sub { font-size:10.5px; color:var(--text-dim); line-height:1.4; }
+  .arch-card--user { border-left:3px solid var(--slate); background:var(--gray-50); align-items:center; text-align:center; }
+  .arch-card--user .arch-card__head { justify-content:center; }
+  .arch-card--web  { border-left:3px solid var(--blue); }
+  .arch-card--api  { border-left:3px solid var(--navy); }
+  .arch-card--db   { border-left:3px solid var(--teal); background:#f4faf9; }
+  .arch-card--llm  { border-left:3px solid var(--blue); }
+  .arch-card--classifier { border-left:3px solid var(--violet); background:var(--violet-soft); }
+  .arch-card--rag  { border-left:3px solid var(--teal); background:#f4faf9; }
+  .arch-card--escalation { border-left:4px solid var(--amber); background:var(--amber-soft); }
+  .arch-card--dash { border-left:3px solid var(--navy); background:var(--blue-soft); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>End-to-end system map</h1>
+  <p>Two actors, five core components, two output paths — one instant, one escalated.</p>
+</div>
+
+<div class="canvas">
+  <svg viewBox="0 0 1600 730" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <marker id="ar"   markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0.5 L8,4.5 L0,8.5 Z" fill="#475569"/></marker>
+      <marker id="ar-b" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0.5 L8,4.5 L0,8.5 Z" fill="#1862a8"/></marker>
+      <marker id="ar-t" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0.5 L8,4.5 L0,8.5 Z" fill="#167b7b"/></marker>
+      <marker id="ar-a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0.5 L8,4.5 L0,8.5 Z" fill="#b45309"/></marker>
+      <filter id="sh1" x="-3%" y="-3%" width="106%" height="112%"><feDropShadow dx="0" dy="1.5" stdDeviation="2.5" flood-color="#0f172a" flood-opacity="0.07"/></filter>
+    </defs>
+
+    <!-- TOP ROW -->
+    <foreignObject x="40" y="30" width="170" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--user">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#475569"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4,21 v-1 c0-3.5 3-6 8-6 s8,2.5 8,6 v1"/></svg></span>
+          <div class="arch-card__name">Student</div>
+        </div>
+        <div class="arch-card__sub">asks a question</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="260" y="30" width="190" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--web">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#1862a8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          <div class="arch-card__name">Chat Interface</div>
+        </div>
+        <div class="arch-card__sub">student-facing · web</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="1100" y="30" width="220" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--dash">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#0e2a4a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+          <div class="arch-card__name">Instructor Dashboard</div>
+        </div>
+        <div class="arch-card__sub">escalation queue · context</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="1390" y="30" width="170" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--user">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#475569"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4,21 v-1 c0-3.5 3-6 8-6 s8,2.5 8,6 v1"/></svg></span>
+          <div class="arch-card__name">Instructor</div>
+        </div>
+        <div class="arch-card__sub">reviews escalations</div>
+      </div>
+    </foreignObject>
+
+    <!-- LEFT COLUMN (storage) -->
+    <foreignObject x="40" y="175" width="200" height="56">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:4px;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#64748b;display:flex;align-items:center;gap:6px;height:100%;box-sizing:border-box;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1862a8" stroke-width="2"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><polyline points="14,2 14,8 20,8"/></svg>
+        syllabus · rubrics · FAQs
+      </div>
+    </foreignObject>
+
+    <foreignObject x="40" y="260" width="200" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--api">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#0e2a4a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+          <div class="arch-card__name">Ingestion Pipeline</div>
+        </div>
+        <div class="arch-card__sub">chunk · embed · index</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="40" y="380" width="200" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--db">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#167b7b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="6" rx="8" ry="2.5"/><path d="M4,6 v12 c0,1.5 4,2.5 8,2.5 s8,-1 8,-2.5 V6"/><path d="M4,11 c0,1.5 4,2.5 8,2.5 s8,-1 8,-2.5"/></svg></span>
+          <div class="arch-card__name">Vector DB</div>
+        </div>
+        <div class="arch-card__sub">chunked course materials</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="40" y="500" width="200" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--db">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#167b7b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></span>
+          <div class="arch-card__name">Question Log</div>
+        </div>
+        <div class="arch-card__sub">ground truth for eval</div>
+      </div>
+    </foreignObject>
+
+    <!-- AI ORCHESTRATION BOX -->
+    <rect x="480" y="155" width="600" height="460" rx="6" fill="#f8fafc" stroke="#1862a8" stroke-width="1.5" filter="url(#sh1)"/>
+    <rect x="480" y="155" width="6" height="460" fill="#1862a8" rx="2"/>
+    <text x="498" y="178" font-family="IBM Plex Mono,monospace" font-size="11" fill="#0e2a4a" font-weight="700" letter-spacing="1.5">AI ORCHESTRATION LAYER</text>
+
+    <foreignObject x="500" y="195" width="540" height="88">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--classifier">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#5b4fcf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
+          <div class="arch-card__name">Intent Classifier</div>
+        </div>
+        <div class="arch-card__sub">LLM-based · routine vs. substantive · confidence scoring</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="500" y="315" width="210" height="88">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--rag">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#167b7b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+          <div class="arch-card__name">Response Generator</div>
+        </div>
+        <div class="arch-card__sub">RAG · grounded answers</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="730" y="315" width="330" height="88">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--escalation">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#b45309"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+          <div class="arch-card__name">Escalation Engine</div>
+        </div>
+        <div class="arch-card__sub">packages context · routes to instructor</div>
+      </div>
+    </foreignObject>
+
+    <foreignObject x="500" y="440" width="540" height="88">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="arch-card arch-card--llm">
+        <div class="arch-card__head">
+          <span class="arch-card__icon" style="color:#1862a8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12,3 v3 M12,18 v3 M3,12 h3 M18,12 h3 M5.6,5.6 l2.1,2.1 M16.3,16.3 l2.1,2.1 M5.6,18.4 l2.1,-2.1 M16.3,7.7 l2.1,-2.1"/></svg></span>
+          <div class="arch-card__name">LLM · Claude API</div>
+        </div>
+        <div class="arch-card__sub">classification · generation · reasoning</div>
+      </div>
+    </foreignObject>
+
+    <!-- ARROWS -->
+    <path d="M210,72 H258" stroke="#475569" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+    <text x="216" y="66" font-family="IBM Plex Mono,monospace" font-size="9" fill="#64748b">question</text>
+
+    <path d="M355,114 V140 H780 V153" stroke="#1862a8" stroke-width="1.5" fill="none" marker-end="url(#ar-b)"/>
+    <text x="490" y="134" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1862a8">question</text>
+
+    <path d="M140,231 V258" stroke="#1862a8" stroke-width="1.3" fill="none" stroke-dasharray="5 3" marker-end="url(#ar-b)"/>
+
+    <path d="M140,344 V378" stroke="#475569" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+
+    <path d="M240,422 H460 V359 H498" stroke="#167b7b" stroke-width="1.5" fill="none" marker-end="url(#ar-t)"/>
+    <text x="248" y="415" font-family="IBM Plex Mono,monospace" font-size="9" fill="#167b7b">retrieve</text>
+
+    <path d="M480,560 H270 V542 H242" stroke="#475569" stroke-width="1.3" fill="none" stroke-dasharray="5 3" marker-end="url(#ar)"/>
+    <text x="290" y="554" font-family="IBM Plex Mono,monospace" font-size="9" fill="#475569">log</text>
+
+    <path d="M1060,359 H1090 V72 H1098" stroke="#b45309" stroke-width="1.5" fill="none" stroke-dasharray="6 3" marker-end="url(#ar-a)"/>
+    <text x="1063" y="215" font-family="IBM Plex Mono,monospace" font-size="9" fill="#b45309">escalate</text>
+
+    <path d="M1320,72 H1388" stroke="#475569" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+
+    <path d="M500,359 H460 V130 H357" stroke="#167b7b" stroke-width="1.5" fill="none" stroke-dasharray="6 3" marker-end="url(#ar-t)"/>
+    <text x="362" y="124" font-family="IBM Plex Mono,monospace" font-size="9" fill="#167b7b">answer</text>
+  </svg>
+</div>
+
+</body>
+</html>
